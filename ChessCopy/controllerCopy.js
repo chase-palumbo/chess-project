@@ -13,6 +13,28 @@ const lostPieces = document.querySelector('.lost-pieces--box');
 const blackKing = document.querySelector('.king-piece.black');
 const whiteKing = document.querySelector('.king-piece.white');
 
+const allSquares = Array.from(board.children);
+
+let allWhitePieces = [];
+allSquares.forEach(sq => {
+  const occupyingPiece = sq.children[0];
+
+  occupyingPiece && occupyingPiece.classList.contains('white') ? allWhitePieces.push(occupyingPiece) : sq;
+});
+
+let allBlackPieces = [];
+allSquares.forEach(sq => {
+  const occupyingPiece = sq.children[0];
+
+  occupyingPiece && occupyingPiece.classList.contains('black') ? allBlackPieces.push(occupyingPiece) : sq;
+});
+console.log(allBlackPieces);
+
+// remove Piece from allPieces array
+const arrayRemove = (arr, value) => arr.filter(el => el !== value);
+
+
+
 // state =
 // turnNum,
 // curPiece,
@@ -39,8 +61,6 @@ const state = {
   },
 };
 
-
-
 // Get data from clicked piece
 const updateState = function(e) {
   state.curPiece = e.target.closest('.piece');
@@ -63,6 +83,9 @@ const updateState = function(e) {
     : null;
   
   state.possibleMoves = state.module.possibleMoves(state.curPiece, state.player);
+
+  if (state.pieceType === 'king-piece') preventSelfCheck(state.curPiece, state.player);
+
   console.log(state);
 };
 
@@ -88,6 +111,7 @@ const dropPiece = function(e) {
   const dropSquare = e.target.closest('.square');
   const curPlayer = state.player;
 
+  // Checks if square is a valid move
   if (
     !dropSquare ||
     !state.possibleMoves.includes(dropSquare.id)
@@ -95,27 +119,40 @@ const dropPiece = function(e) {
     unclickPiece();
     return;
 
-  } else if (dropSquare.children.length > 0) {
-    const occupyingPiece = Array.from(dropSquare.children)[0];
+  // Checks if square has a villain piece in it and captures it
+  }  else if (dropSquare.children.length > 0) {
+    const capturedPiece = Array.from(dropSquare.children)[0];
+    if (curPlayer === 'white') {
+      takenPieces.appendChild(capturedPiece);
+      allBlackPieces = arrayRemove(allBlackPieces, capturedPiece);
+    } else {
+      lostPieces.appendChild(capturedPiece);
+      allWhitePieces = arrayRemove(allWhitePieces, capturedPiece);
+    }
+    dropPieceHandler(dropSquare, state.curPiece, curPlayer);
+    updateActionLog(dropSquare, curPlayer, capturedPiece);
 
-    state.player === 'white' ? takenPieces.appendChild(occupyingPiece) 
-    : lostPieces.appendChild(occupyingPiece);
-
-    dropPieceHandler(dropSquare, state.curPiece, state.player);
-    updateActionLog(dropSquare, occupyingPiece);
-
+  // Moves to valid empty square
   } else {
-    dropPieceHandler(dropSquare, state.curPiece, state.player);
-    updateActionLog(dropSquare);
+    dropPieceHandler(dropSquare, state.curPiece, curPlayer);
+    updateActionLog(dropSquare, curPlayer);
   }  
 };
 
-const dropPieceHandler = function(dropSq, piece) {
+const dropPieceHandler = function(dropSq, piece, player) {
+  const villainKingState = player === 'white' ? state.blackKing : state.whiteKing;
+
   dropSq.appendChild(piece);
   unclickPiece();
+  checkForCheck(piece, player, villainKingState);
+  
+  // If check, check for checkmate
+  if (villainKingState.inCheck) checkForCheckmate(player, villainKingState);
+
+  // Checks for threatening bishop, rook, queen pieces;
   KingPiece.checkAllLines(state.whiteKing, whiteKing, 'white');
   KingPiece.checkAllLines(state.blackKing, blackKing, 'black');
-  // checkIfCheck(piece, player);
+
   state.turnNum++;
 };
 
@@ -143,50 +180,177 @@ const unclickPiece = function() {
 
 
 // Add move to action log
-const updateActionLog = function(dropSq, takenPiece = '') {
+const updateActionLog = function(dropSq, player, takenPiece = '') {
   const turn = state.turnNum;
   const curPiece = state.pieceType.split('-')[0];
   const pieceName = curPiece[0].toUpperCase() + curPiece.slice(1);
   const curSquare = state.curSquare.id;
-  const color = state.player[0].toUpperCase();
+  const color = player[0].toUpperCase();
   const dropSquare = dropSq.id;
+  const villainKingState = player === 'white' ? state.blackKing : state.whiteKing;
 
   const checkMarkup = `
-    <span class="action-check--${state.player}"><strong>CHECK!</strong> </span>
+    <span class="action-check--${player}"><strong>CHECK!</strong> </span>
   `;
   
   const markup = takenPiece ? `
-    <ul class="action-text">${turn}. ${state.check ? checkMarkup : ''}${color}-${pieceName} on ${curSquare} to ${dropSquare}.  Player ${state.player} takes out ${takenPiece.classList[0]}!</ul>
+    <ul class="action-text">${turn}. ${villainKingState.inCheck ? checkMarkup : ''}${color}-${pieceName} on ${curSquare} to ${dropSquare}.  Player ${player} takes out ${takenPiece.classList[0]}!</ul>
     ` 
     : `
-    <ul class="action-text">${turn}. ${state.check ? checkMarkup : ''}${color}-${pieceName} on ${curSquare} to ${dropSquare}</ul>
+    <ul class="action-text">${turn}. ${villainKingState.inCheck ? checkMarkup : ''}${color}-${pieceName} on ${curSquare} to ${dropSquare}</ul>
   `;
   
   actionLog.insertAdjacentHTML('afterbegin', markup);
 };
 
+const checkForCheck = function(curPc, player, vKingState) {
+  let piecesArr = player === 'white' ? allWhitePieces : allBlackPieces;
+  const allNextHeroMoves = getAllMoves(piecesArr, player);
 
+  const villainKing = player === 'white' ? blackKing : whiteKing;
+  const vKingSquareID = villainKing.parentElement.id;
 
-
-const undoMove = function(king) {
-  
-  
+  const check = allNextHeroMoves.includes(vKingSquareID) ? true : false;
+    
+  if (check) {
+    vKingState.inCheck = true;
+    console.log('CHECK');
+  }
+  else vKingState.inCheck = false;
 };
+
+// If villain King is in check:
+const checkForCheckmate = function(player) {
+  const villain = player === 'white' ? 'black' : 'white';
+  const villainKing = player === 'white' ? blackKing : whiteKing;
+  let piecesArr = player === 'white' ? allWhitePieces : allBlackPieces;
+
+  // get villain King moves
+  const nextKingMoves = KingPiece.possibleMoves(villainKing, villain);
+
+  // get ALL hero moves
+  const allNextHeroMoves = getAllMoves(piecesArr, player);
+
+  // check if all hero moves includes every villain king move;
+  const checkmate = nextKingMoves.every(move => allNextHeroMoves.includes(move));
+
+  if (checkmate) {
+    console.log(checkmate);
+    alert(`${player} Checkmate!`);
+  } else return;
+};
+
+const getAllMoves = function(allPieces, player) {
+  const allMoves = [];
+
+  allPieces.forEach(piece => {
+    const pieceType = piece.classList[0];
+    const module = 
+      pieceType === 'pawn-white-piece' ? WhitePawnPiece
+      : pieceType === 'pawn-black-piece' ? BlackPawnPiece
+      : pieceType === 'bishop-piece' ? BishopPiece
+      : pieceType === 'rook-piece' ? RookPiece
+      : pieceType === 'knight-piece' ? KnightPiece
+      : pieceType === 'king-piece' ? KingPiece
+      : pieceType === 'queen-piece' ? QueenPiece
+      : null;
+    
+    const nextMoves = module.possibleMoves(piece, player);
+    allMoves.push(...nextMoves);
+  });
+
+  return allMoves;
+};
+
+// Get all possible moves. After trying each move, get all villain moves and
+// see if they include hero king square (check).  If so, filter that move out 
+// of possibleMoves.
+const simulateAllMoves = function(curPc, player) {
+  if (!curPc) return;
+  curPc.classList.add('hidden');
+  const initialSq = state.curSquare;
+  const villain = player === 'white' ? 'black' : 'white';
+  const possibleMoves = state.possibleMoves;
+
+  const newMoves = possibleMoves.filter(move => {
+    const moveSquare = document.getElementById(move);
+
+    const occupyingPiece = Array.from(moveSquare.children)[0];
+    // see if capturing this piece will get your king out of check
+    if (occupyingPiece) {
+      occupyingPiece.classList.add('hidden');
+      actionLog.appendChild(occupyingPiece);
+      moveSquare.appendChild(curPc);
+
+
+      let vPiecesArr = player === 'white' ? allBlackPieces : allWhitePieces;
+      vPiecesArr = arrayRemove(vPiecesArr, occupyingPiece);
+      const allNextVillainMoves = getAllMoves(vPiecesArr, villain);
+
+      const kingSquare = player === 'white' ? whiteKing.parentElement.id : blackKing.parentElement.id;
+
+      moveSquare.appendChild(occupyingPiece);
+      occupyingPiece.classList.remove('hidden');
+      vPiecesArr.push(occupyingPiece);
+
+      if (!allNextVillainMoves.includes(kingSquare)) return move;
+
+    } else {
+      // see if moving to this square will get your king out of check
+      moveSquare.appendChild(curPc);
+
+      let vPiecesArr = player === 'white' ? allBlackPieces : allWhitePieces;
+      const allNextVillainMoves = getAllMoves(vPiecesArr, villain);
+
+      const kingSquare = player === 'white' ? whiteKing.parentElement.id : blackKing.parentElement.id;
+
+      if (!allNextVillainMoves.includes(kingSquare)) return move;
+    }
+  });
+
+  initialSq.appendChild(curPc);
+  curPc.classList.remove('hidden');
+  state.possibleMoves = newMoves;
+};
+
+// King Only: Update possibleMoves without self-check squares
+const preventSelfCheck = function(kingPc, player) {
+  const villain = player === 'white' ? 'black' : 'white';
+  let vPiecesArr = player === 'white' ? allBlackPieces : allWhitePieces;
+  const allNextVillainMoves = getAllMoves(vPiecesArr, villain);
+
+  const curKingMoves = state.possibleMoves;
+  const filteredMoves = curKingMoves.filter(move => !allNextVillainMoves.includes(move))
+
+  state.possibleMoves = filteredMoves;
+};
+
+
+
+
+
+
 
 // Called when a piece is clicked
 const clickPieceHandler = function(e) {
   updateState(e);
   // if (state.activePlayer !== state.player) return;
+  const hKingState = state.player === 'white' ? state.whiteKing : state.blackKing;
+
+  // Checks if your king is in check OR the piece you clicked on is blocking
+  // your king from being in check
+  if (
+    hKingState.inCheck ||
+    hKingState.blockPieces.includes(state.curPiece)
+  ) simulateAllMoves(state.curPiece, state.player);
+  
+
   renderSquares();
   movePiece(e);
 };
 
 // Board listens for a clicked piece
 board.addEventListener('click', clickPieceHandler);
-
-
-
-
 
 
 

@@ -11,7 +11,7 @@ const boardSquares = [
 
 class BlackPawnPiece {
   possibleMoves(piece) {
-    const [curLet, curNum] = piece.closest('.square').id.split('');
+    const [curLet, curNum] = piece.parentElement.id.split('');
     const possibleAttacks = [];
     const validMoves = [];
 

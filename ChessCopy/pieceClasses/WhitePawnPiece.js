@@ -10,20 +10,9 @@ const boardSquares = [
 ];
 
 class WhitePawnPiece {
-  // possibleMoves(piece) {
-  //     const [curLet, curNum] = piece.closest('.square').id.split('');
-     
-  //     const possibleNumber = String.fromCharCode(curNum.charCodeAt(0) + 1);
-    
-  //     const position = `${curLet}${possibleNumber}`;
-  //     const possiblePosition = boardSquares.includes(position) ? [position] : null;
-
-  //     const openMove = this.checkOccupiedSquares(possiblePosition);
-  //     return openMove;
-  // }
 
   possibleMoves(piece) {
-    const [curLet, curNum] = piece.closest('.square').id.split('');
+    const [curLet, curNum] = piece.parentElement.id.split('');
     const possibleAttacks = [];
     const validMoves = [];
 

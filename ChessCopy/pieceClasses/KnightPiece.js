@@ -2,7 +2,7 @@
 
 class KnightPiece {
   possibleMoves(piece, player) {
-      const [curLet, curNum] = piece.closest('.square').id.split('');
+      const [curLet, curNum] = piece.parentElement.id.split('');
       const villian = player === 'white' ? 'black' : 'white';
       const allPossiblePositions = [];
 
